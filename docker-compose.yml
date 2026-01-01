@@ -1,0 +1,49 @@
+services:
+  redis:
+    image: redis:7
+    networks: [appnet]
+
+  backend:
+    build: ./backend
+    volumes:
+      - ./shared_tmp:/shared/tmp
+    environment:
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "3000:3000"
+    depends_on: [redis]
+    networks: [appnet]
+
+  processor:
+    build: ./processor
+    volumes:
+      - ./shared_tmp:/shared/tmp
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on: [redis]
+    networks: [appnet]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: dev
+      args:
+        MODE: dev
+    container_name: frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:3000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - appnet
+    command: [ "npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173" ]
+
+networks:
+  appnet:
+    driver: bridge
