@@ -2,26 +2,44 @@ services:
   redis:
     image: redis:7
     networks: [appnet]
+    volumes:
+      - redis_data:/data
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on: [ redis ]
+    networks: [ appnet ]
 
   backend:
+    env_file:
+      - .env
     build: ./backend
     volumes:
       - ./shared_tmp:/shared/tmp
+      - ./backend/src:/app/src  # Mount source for hot reload
     environment:
       - REDIS_URL=redis://redis:6379
     ports:
       - "3000:3000"
     depends_on: [redis]
     networks: [appnet]
+    command: ["npx", "tsx", "watch", "src/index.ts"]
 
   processor:
     build: ./processor
     volumes:
       - ./shared_tmp:/shared/tmp
+      - ./processor:/app  # Mount source
     environment:
       - REDIS_URL=redis://redis:6379
+      - PYTHONDONTWRITEBYTECODE=1
     depends_on: [redis]
     networks: [appnet]
+    command: ["watchmedo", "auto-restart", "--patterns=*.py", "--recursive", "--", "python", "-u", "worker.py"]
 
   frontend:
     build:
@@ -35,6 +53,7 @@ services:
       - "5173:5173"
     environment:
       - VITE_API_URL=http://localhost:3000
+      - CHOKIDAR_USEPOLLING=true
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -47,3 +66,6 @@ services:
 networks:
   appnet:
     driver: bridge
+
+volumes:
+  redis_data:
