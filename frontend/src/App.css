@@ -149,3 +149,51 @@ h1 {
   border-radius: 12px;
   text-shadow: 0 1px 4px rgba(0,0,0,0.4);
 }
+
+.progress-container {
+  width: 100%;
+  max-width: 400px;
+  margin: 20px auto;
+}
+
+.progress-label {
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: #666;
+}
+
+.progress-bar {
+  height: 8px;
+  background: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.progress-fill.upload {
+  background: linear-gradient(90deg, #4caf50, #8bc34a);
+}
+
+.progress-fill.processing {
+  background: linear-gradient(90deg, #2196f3, #03a9f4, #00bcd4);
+  background-size: 200% 100%;
+}
+
+.progress-fill.animated {
+  width: 100%;
+  animation: shimmer 1.5s infinite linear;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.status.error {
+  color: #f44336;
+}

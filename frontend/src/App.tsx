@@ -15,6 +15,8 @@ function App() {
   const [job, setJob] = useState<JobInfo | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [dragCounter, setDragCounter] = useState(0);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const handleFiles = (files: FileList | null) => {
@@ -22,6 +24,7 @@ function App() {
     setFile(files[0]);
     setJob(null);
     setResultUrl(null);
+    setUploadProgress(0);
   };
 
   useEffect(() => {
@@ -54,12 +57,40 @@ function App() {
 
   const uploadFile = async () => {
     if (!file) return;
+
+    setIsUploading(true);
+    setUploadProgress(0);
+
     const data = new FormData();
     data.append("media", file);
 
-    const res = await fetch(`${BASE_URL}/process`, { method: "POST", body: data });
-    const json = await res.json();
-    if (json.id) setJob({ id: json.id, status: "queued" });
+    try {
+      const xhr = new XMLHttpRequest();
+
+      xhr.upload.addEventListener("progress", (e) => {
+        if (e.lengthComputable) {
+          const percent = Math.round((e.loaded * 100) / e.total);
+          setUploadProgress(percent);
+        }
+      });
+
+      xhr.onload = () => {
+        setIsUploading(false);
+        if (xhr.status >= 200 && xhr.status < 300) {
+          const json = JSON.parse(xhr.responseText);
+          if (json.id) setJob({ id: json.id, status: "queued" });
+        }
+      };
+
+      xhr.onerror = () => {
+        setIsUploading(false);
+      };
+
+      xhr.open("POST", `${BASE_URL}/process`);
+      xhr.send(data);
+    } catch {
+      setIsUploading(false);
+    }
   };
 
   useEffect(() => {
@@ -78,31 +109,18 @@ function App() {
 
   const openFileDialog = () => inputRef.current?.click();
 
-  const statusText =
-    job?.status === "queued"
-      ? "Job Scheduled..."
-      : job?.status === "processing"
-      ? "Processing, Please wait..."
-      : job?.status === "done"
-      ? "Done!"
-      : job?.status === "failed"
-      ? `Failed, try again later`
-      : "";
-
   const showOverlay = dragCounter > 0;
 
   return (
     <div className="app">
       <h1>Background Remover</h1>
 
-      {/* === Global Overlay === */}
       {showOverlay && (
         <div className="overlay">
           <div className="overlay-text">You can drop the file</div>
         </div>
       )}
 
-      {/* === Dropzone (klikli alan) === */}
       <div className="dropzone" onClick={openFileDialog}>
         {file ? (
           <>
@@ -126,13 +144,38 @@ function App() {
         />
       </div>
 
-      <button className="button" disabled={!file} onClick={uploadFile}>
-        Send
+      <button className="button" disabled={!file || isUploading} onClick={uploadFile}>
+        {isUploading ? "Uploading..." : "Send"}
       </button>
 
-      {job && (
-        <div className="status">
-          <p>{statusText}</p>
+      {/* Upload Progress Bar */}
+      {isUploading && (
+        <div className="progress-container">
+          <div className="progress-label">Uploading: {uploadProgress}%</div>
+          <div className="progress-bar">
+            <div
+              className="progress-fill upload"
+              style={{ width: `${uploadProgress}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Processing Indicator */}
+      {job && (job.status === "queued" || job.status === "processing") && (
+        <div className="progress-container">
+          <div className="progress-label">
+            {job.status === "queued" ? "Job Scheduled..." : "Removing background..."}
+          </div>
+          <div className="progress-bar">
+            <div className="progress-fill processing animated" />
+          </div>
+        </div>
+      )}
+
+      {job?.status === "failed" && (
+        <div className="status error">
+          <p>Failed, try again later</p>
         </div>
       )}
 
@@ -150,10 +193,7 @@ function App() {
           ) : (
             <img src={resultUrl} alt="Processed" className="preview" />
           )}
-          <a className="button secondary"
-             href={`${resultUrl}?download=1`}
-             download
-          >
+          <a className="button secondary" href={`${resultUrl}?download=1`} download>
             Download
           </a>
         </div>
