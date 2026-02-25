@@ -87,6 +87,7 @@ def process_video(input_path: str, output_path: str):
     except Exception as e:
         print(f"[VIDEO][ERROR] {e}", flush=True)
         traceback.print_exc()
+        raise
 
 def process_image(input_path: str, output_path: str):
     try:
@@ -99,12 +100,14 @@ def process_image(input_path: str, output_path: str):
     except Exception as e:
         print(f"[IMG][ERROR] {e}", flush=True)
         traceback.print_exc()
+        raise
 
 # ----------------  main worker thread  ---------------- #
 print("Worker started, queue listener + cleanup active", flush=True)
 threading.Thread(target=clean_old_files, daemon=True).start()
 
 while True:
+    state_key = None
     try:
         job = r.brpop(QUEUE, timeout=10)
         if not job:
@@ -129,4 +132,6 @@ while True:
     except Exception as e:
         print("❌ [WORKER][ERROR]:", e, flush=True)
         traceback.print_exc()
+        if state_key:
+            r.hset(state_key, mapping={"status": "failed"})
         time.sleep(2)
